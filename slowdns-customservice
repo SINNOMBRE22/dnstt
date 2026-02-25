@@ -1,170 +1,139 @@
 #!/bin/bash
-clear
-fun_bar () {
-comando[0]="$1"
-comando[1]="$2"
- (
-[[ -e $HOME/fim ]] && rm $HOME/fim
-${comando[0]} -y > /dev/null 2>&1
-${comando[1]} -y > /dev/null 2>&1
-touch $HOME/fim
- ) > /dev/null 2>&1 &
- tput civis
-echo -ne "  \033[1;33mESPERA \033[1;37m- \033[1;33m["
-while true; do
-   for((i=0; i<18; i++)); do
-   echo -ne "\033[1;31m#"
-   sleep 0.1s
-   done
-   [[ -e $HOME/fim ]] && rm $HOME/fim && break
-   echo -e "\033[1;33m]"
-   sleep 1s
-   tput cuu1
-   tput dl1
-   echo -ne "  \033[1;33mESPERA \033[1;37m- \033[1;33m["
-done
-echo -e "\033[1;33m]\033[1;37m -\033[1;32m OK !\033[1;37m"
-tput cnorm
-}
 
-echo -e "\033[1;31m════════════════════════════════════════════════════\033[0m"
-tput setaf 7 ; tput bold ; printf '%40s%s%-12s\n' "INSTALANDO SERVICIO PERSONALIZADO SLOWDNS" ; tput sgr0
-echo -e "\033[1;31m════════════════════════════════════════════════════\033[0m"
-echo ""
-echo -e "      Este script instalará"
-echo -e " SlowDNS para túnel DNS con Servicio Personalizado."
-echo -e ""
-echo -e "         \033[1;33mInstalador Mod VpsPack \033[1;37m"
-echo -e ""
-echo -e "\033[1;31m════════════════════════════════════════════════════\033[0m"
-echo ""
-echo -e "ACTUALIZANDO LISTA DE PAQUETES..."
-
-fun_att () {
-apt update && apt upgrade -y
-}
-fun_bar 'fun_att'
-
-echo -e "INSTALANDO Y ACTUALIZANDO PAQUETES NECESARIOS..."
-
-install_pkgs () {
-apt install screen -y
-apt install cron -y
-apt install iptables -y
-service cron reload
-service cron restart
-service iptables reload
-service iptables restart
-}
-fun_bar 'install_pkgs'
-
-echo -e "CONFIGURANDO IPTABLES..."
-
-ipt_set () {
-cd /etc
-mv rc.local rc.local.bkp
-wget https://github.com/powermx/dnstt/raw/main/rc.local
-chmod +x /etc/rc.local
-systemctl enable rc-local
-systemctl start rc-local
-}
-fun_bar 'ipt_set'
-
-clear
-echo ""
-echo -e "\033[1;31m ¡ATENCIÓN EN ESTA ETAPA! \033[1;33m"
-echo ""
-echo -ne "\033[1;32m INGRESA TU NS (NAMESERVER)\033[1;37m: "; read nameserver
-
-cd /etc/slowdns
-touch infons
-echo $nameserver > infons
-sleep 1
-
-echo ""
-echo -ne "\033[1;32m INGRESA EL PUERTO DEL SERVICIO A USAR CON SLOWDNS (NO 53/5300)\033[1;37m: "
-read customservice
-
-if [[ "$customservice" == "53" || "$customservice" == "5300" ]]; then
-    echo -e "\033[1;31m ERROR: El puerto no puede ser 53 ni 5300. \033[0m"
+# Verificar root
+if [[ $EUID -ne 0 ]]; then
+    echo "Este script debe ejecutarse como root"
     exit 1
 fi
 
+clear
+
+# Colores
+RED='\033[1;31m'
+GREEN='\033[1;32m'
+YELLOW='\033[1;33m'
+WHITE='\033[1;37m'
+RESET='\033[0m'
+
+# Barra limpia
+fun_bar() {
+    (
+        eval "$1" > /dev/null 2>&1
+        touch $HOME/fim
+    ) &
+    tput civis
+    echo -ne "  PROCESANDO ["
+    while true; do
+        for ((i=0;i<18;i++)); do
+            echo -ne "#"
+            sleep 0.1
+        done
+        [[ -e $HOME/fim ]] && rm $HOME/fim && break
+        echo -ne "]"
+        sleep 1
+        tput cuu1 && tput dl1
+        echo -ne "  PROCESANDO ["
+    done
+    echo -e "] OK"
+    tput cnorm
+}
+
+echo -e "${RED}════════════════════════════════════════════${RESET}"
+echo -e "${GREEN} INSTALADOR SLOWDNS SERVICIO PERSONALIZADO${RESET}"
+echo -e "${RED}════════════════════════════════════════════${RESET}"
+echo ""
+
+echo "Actualizando sistema..."
+fun_bar "apt update -y && apt upgrade -y"
+
+echo "Instalando dependencias..."
+fun_bar "apt install screen cron iptables wget -y"
+
+# Crear carpeta
+mkdir -p /etc/slowdns
+
+echo "Descargando binario DNSTT..."
+fun_bar "cd /etc/slowdns && wget -q https://github.com/powermx/dnstt/raw/main/dns-server && chmod +x dns-server"
+
+# Firewall seguro
+configurar_firewall() {
+iptables -C INPUT -p udp --dport 5300 -j ACCEPT 2>/dev/null || \
+iptables -I INPUT -p udp --dport 5300 -j ACCEPT
+
+iptables -t nat -C PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300 2>/dev/null || \
+iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
+}
+
+fun_bar configurar_firewall
+
+# Configurar inicio automático sin romper rc.local
+configurar_inicio() {
+RC="/etc/rc.local"
+if [ ! -f "$RC" ]; then
+    echo -e "#!/bin/bash\n\nexit 0" > $RC
+    chmod +x $RC
+fi
+LINE='cd /etc/slowdns && ./startdns'
+grep -Fxq "$LINE" "$RC" || sed -i "/^exit 0/i $LINE" "$RC"
+}
+fun_bar configurar_inicio
+
+echo ""
+read -p "Ingresa tu NS (Nameserver): " nameserver
+echo "$nameserver" > /etc/slowdns/infons
+
+echo ""
+read -p "Ingresa el puerto del servicio (NO usar 53 ni 5300): " customport
+
+if [[ "$customport" == "53" || "$customport" == "5300" ]]; then
+    echo -e "${RED}ERROR: No puedes usar el puerto 53 ni 5300${RESET}"
+    exit 1
+fi
+
+# Crear startdns
 cat <<EOF > /etc/slowdns/startdns
 #!/bin/bash
-echo "INICIANDO SLOWDNS"
-screen -dmS slowdns$customservice /etc/slowdns/dns-server -udp :5300 -privkey-file /root/server.key $nameserver 127.0.0.1:$customservice
-echo ""
-echo "       ¡SLOWDNS INICIADO CORRECTAMENTE!"
+screen -dmS slowdns$customport /etc/slowdns/dns-server -udp :5300 -privkey-file /root/server.key $nameserver 127.0.0.1:$customport
 EOF
 
+# Crear restartdns
 cat <<EOF > /etc/slowdns/restartdns
 #!/bin/bash
-echo "REINICIANDO SLOWDNS"
-screen -ls | grep slowdns | cut -d. -f1 | awk '{print \$1}' | xargs kill
-screen -dmS slowdns$customservice /etc/slowdns/dns-server -udp :5300 -privkey-file /root/server.key $nameserver 127.0.0.1:$customservice
-echo ""
-echo "¡SlowDNS Reiniciado Correctamente! [✔]"
+screen -ls | grep slowdns | cut -d. -f1 | awk '{print \$1}' | xargs kill 2>/dev/null
+screen -dmS slowdns$customport /etc/slowdns/dns-server -udp :5300 -privkey-file /root/server.key $nameserver 127.0.0.1:$customport
 EOF
 
-set_ns () {
 chmod +x /etc/slowdns/startdns
 chmod +x /etc/slowdns/restartdns
 cp /etc/slowdns/startdns /bin/
 cp /etc/slowdns/restartdns /bin/
-}
-fun_bar 'set_ns'
 
-echo ""
-echo "Verificando existencia de clave..."
-sleep 2
-echo ""
-echo "      Por favor espera...  "
-sleep 2
+cd /root
 
-cd
-key1="/root/server.key"
-key2="/root/server.pub"
+# Manejo de claves
+if [[ ! -f server.key || ! -f server.pub ]]; then
+    echo "Generando nuevas claves..."
+    cd /etc/slowdns
+    ./dns-server -gen-key -privkey-file /root/server.key -pubkey-file /root/server.pub
+fi
 
-if [ -f $key1 ] && [ -f $key2 ]
-then
-echo -e "¡Archivo de clave encontrado!"
-sleep 1
-echo ""
+cp /root/server.key /root/server.pub /etc/slowdns/
 
-echo -e "\033[1;31m INSTALACIÓN COMPLETADA!\033[0m"
-echo ""
-echo -ne "\033[1;33mTU NS:\033[0m " && cat /etc/slowdns/infons
-echo ""
-echo -ne "\033[1;33mTU CLAVE PÚBLICA:\033[0m " && cat /root/server.pub
-echo ""
-echo -e "\033[1;33m TU CLAVE está guardada en /root/server.pub\033[0m"
-echo -e "\033[1;33mGuárdala en un lugar seguro, puede que la necesites en el futuro.\033[0m"
-echo ""
-read -p "Presiona [Enter] para volver al menú o CTRL+C para salir"
-slowdns
-
-else
-
-echo -e "No se encontraron claves, generando nuevas..."
-cd /etc/slowdns/
-./dns-server -gen-key -privkey-file /root/server.key -pubkey-file /root/server.pub
-
-iptables -I INPUT -p udp --dport 5300 -j ACCEPT
-iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
+# Iniciar servicio
+cd /etc/slowdns
 ./startdns
 
 clear
-echo -e "\033[1;31m INSTALACIÓN COMPLETADA!\033[0m"
+echo -e "${GREEN}INSTALACIÓN COMPLETADA ✔${RESET}"
 echo ""
-echo -ne "\033[1;33mTU NS:\033[0m " && cat /etc/slowdns/infons
+echo -e "${YELLOW}Tu NS:${WHITE} $(cat /etc/slowdns/infons)"
 echo ""
-echo -ne "\033[1;33mTU CLAVE PÚBLICA:\033[0m " && cat /root/server.pub
+echo -e "${YELLOW}Tu clave pública:${WHITE}"
+cat /root/server.pub
 echo ""
-echo -e "\033[1;33m TU CLAVE está guardada en /root/server.pub\033[0m"
-echo -e "\033[1;33mGuárdala en un lugar seguro.\033[0m"
+echo -e "${YELLOW}Puerto configurado:${WHITE} $customport"
 echo ""
-read -p "Presiona [Enter] para volver al menú o CTRL+C para salir"
+echo -e "${YELLOW}La clave está guardada en:${WHITE} /root/server.pub"
+echo ""
+read -p "Presiona ENTER para volver al menú..."
 slowdns
-
-fi
