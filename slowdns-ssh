@@ -1,299 +1,170 @@
 #!/bin/bash
-# Definir variables para colores de texto
+
+# Verificar root
+if [[ $EUID -ne 0 ]]; then
+    echo "Este script debe ejecutarse como root"
+    exit 1
+fi
+
+clear
+
+# Colores
 RED='\033[1;31m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
-BLUE='\033[1;34m'
-PURPLE='\033[1;35m'
-CYAN='\033[1;36m'
-GRAY='\033[1;37m'
 WHITE='\033[1;37m'
-# Definir variables para colores de fondo
-BG_RED='\033[0;41m'
-BG_GREEN='\033[0;42m'
-BG_YELLOW='\033[0;43m'
-BG_BLUE='\033[0;44m'
-BG_PURPLE='\033[0;45m'
-BG_CYAN='\033[0;46m'
-BG_GRAY='\033[0;47m'
-# Resetear colores
 RESET='\033[0m'
-clear
-fun_bar () {
-comando[0]="$1"
-comando[1]="$2"
- (
-[[ -e $HOME/fim ]] && rm $HOME/fim
-${comando[0]} -y > /dev/null 2>&1
-${comando[1]} -y > /dev/null 2>&1
-touch $HOME/fim
- ) > /dev/null 2>&1 &
- tput civis
-echo -e "${YELLOW}WAIT -"
-while true; do
-   for((i=0; i<18; i++)); do
-   echo -ne "\033[1;31m#"
-   sleep 0.1s
-   done
-   [[ -e $HOME/fim ]] && rm $HOME/fim && break
-   echo -e "\033[1;33m]"
-   sleep 1s
-   tput cuu1
-   tput dl1
-   echo -ne "  \033[1;33mWAIT \033[1;37m- \033[1;33m["
-done
-echo -e "\033[1;33m]\033[1;37m -\033[1;32m OK !\033[1;37m"
-tput cnorm
+
+# Barra de progreso corregida
+fun_bar() {
+    (
+        eval "$1" > /dev/null 2>&1
+        touch $HOME/fim
+    ) &
+
+    tput civis
+    echo -ne "  ESPERANDO ["
+    while true; do
+        for ((i=0;i<18;i++)); do
+            echo -ne "#"
+            sleep 0.1
+        done
+        [[ -e $HOME/fim ]] && rm $HOME/fim && break
+        echo -ne "]"
+        sleep 1
+        tput cuu1 && tput dl1
+        echo -ne "  ESPERANDO ["
+    done
+    echo -e "] OK"
+    tput cnorm
 }
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────────── /// ────────────────── ${YELLOW}"
-figlet -p -f slant SlowDNS
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────── SlowDNS SSH ────────────── ${YELLOW}"
-echo -e ""
-echo -e "      This script will install the"
-echo -e "     slowdns for DNS tunneling with SSH."
-echo -e ""
-echo -e ""
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────────── /// ────────────────── ${YELLOW}"
+
+# Encabezado
+echo -e "${YELLOW}========================================${RESET}"
+echo -e "${GREEN}      INSTALADOR SLOWDNS SSH${RESET}"
+echo -e "${YELLOW}========================================${RESET}"
 echo ""
-ipt_set () {
+
+# Crear carpeta si no existe
+mkdir -p /etc/slowdns
+
+# Configurar rc.local correctamente
+configurar_rc() {
 RC_LOCAL="/etc/rc.local"
-LINE1='iptables -I INPUT -p udp --dport 5300 -j ACCEPT'
-LINE2='iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300'
-LINE3='cd /etc/slowdns && ./startdns'
+
 if [ ! -f "$RC_LOCAL" ]; then
-  echo -e "#!/bin/bash\n\nexit 0" > "$RC_LOCAL"
-  chmod +x "$RC_LOCAL"
-fi
-for LINE in "$LINE1" "$LINE2" "$LINE3"; do
-  grep -Fxq "$LINE" "$RC_LOCAL" || sed -i "/^exit 0/i $LINE" "$RC_LOCAL"
-done
-}
-fun_bar 'ipt_set'
-clear
-echo ""
-echo -e "\033[1;31m ATTENTION IN THIS STAGE! \033[1;33m"
-echo ""
-echo -ne "\033[1;32m ENTER YOUR NS (NAMESERVER)\033[1;37m: "; read nameserver
-cd /etc/slowdns
-touch infons
-echo $nameserver > infons
-set_ns () {
-sleep 1
-wget https://raw.githubusercontent.com/powermx/dnstt/main/ssh/startdns 
-wget https://raw.githubusercontent.com/powermx/dnstt/main/ssh/restartdns
-chmod +x startdns
-chmod +x restartdns
-sed -i "s;1234;$nameserver;g" /etc/slowdns/startdns > /dev/null 2>&1
-sed -i "s;1234;$nameserver;g" /etc/slowdns/restartdns > /dev/null 2>&1
-cp startdns /bin/
-cp restartdns /bin/
-}
-fun_bar 'set_ns'
-echo ""
-echo "Checking for existence of key"
-sleep 2
-echo ""
-echo "      Please wait...   "
-sleep 2
-cd
-key1="/root/server.key"
-key2="/root/server.pub"
-if [ -f $key1 ] && [ -f $key2 ]
-then
-echo -e "Key file found!"
-sleep 1
-echo ""
-key () {
-echo "How do you want to get your key?"
-echo ""
-echo "[ 1 ] | Use existing key in file"
-echo "[ 2 ] | Delete file and generate new key"
-echo "[ 3 ] | Delete file and use default key"
-echo "[ x ] | Abort installation"
-echo ""
-echo -ne "Enter an option: " && read option
-case $option in
-1) Option1 ;;
-2) Option2 ;;
-3) Option3 ;;
-x) OptionX ;;
-*) "Unknown command" ; echo ; key;;
-esac
-}
-Option1 () {
-echo -ne "Restoring existing key..." && sleep 2 && echo "OK!"
-echo ""
-echo -e "FINISHING..."
-finish_ist () {
-cd /etc/slowdns
-iptables -I INPUT -p udp --dport 5300 -j ACCEPT
-iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
-./startdns
-}
-fun_bar 'finish_ist'
-clear
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────────── /// ────────────────── ${YELLOW}"
-figlet -p -f slant SlowDNS
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ─────────────── SlowDNS ──────────────── ${YELLOW}"
-echo -e "${GREEN} INSTALLATION COMPLETED!"
-echo ""
-echo -ne "${YELLOW}YOUR NS: ${WHITE} " && cat /etc/slowdns/infons
-echo ""
-echo -ne "${YELLOW}YOUR PUBLIC KEY:\033[0m " && cat /root/server.pub
-echo ""
-echo -e "${YELLOW}YOUR KEY is saved in the file /root/server.pub\033[0m"
-echo -e "${YELLOW}Keep it in a safe place, you may need it in the future!${YELLOW}"
-echo ""
-read -p "Press [Enter] to return to the menu or CTRL+C to exit"
-}
-Option2 () {
-cd
-rm server.key server.pub
-echo "Generating new key"
-cd /etc/slowdns/
-./dns-server -gen-key -privkey-file /root/server.key -pubkey-file /root/server.pub
-echo -e "FINISHING..."
-finish_ist () {
-iptables -I INPUT -p udp --dport 5300 -j ACCEPT
-iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
-./startdns
-cd
-}
-fun_bar 'finish_ist'
-clear
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────────── /// ────────────────── ${YELLOW}"
-figlet -p -f slant SlowDNS
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ─────────────── SlowDNS ──────────────── ${YELLOW}"
-echo -e "${GREEN} INSTALLATION COMPLETED!"
-echo ""
-echo -ne "${YELLOW}YOUR NS: ${WHITE} " && cat /etc/slowdns/infons
-echo ""
-echo -ne "${YELLOW}YOUR PUBLIC KEY:\033[0m " && cat /root/server.pub
-echo ""
-echo -e "${YELLOW}YOUR KEY is saved in the file /root/server.pub\033[0m"
-echo -e "${YELLOW}Keep it in a safe place, you may need it in the future!${YELLOW}"
-echo ""
-read -p "Press [Enter] to return to the menu or CTRL+C to exit"
-}
-Option3 () {
-echo -e "Downloading default key pair..."
-cd
-rm server.key server.pub
-wget https://raw.githubusercontent.com/powermx/dnstt/main/server.key
-wget https://raw.githubusercontent.com/powermx/dnstt/main/server.pub
-sleep 1
-echo -e "Download Completed"
-sleep 1
-cd /etc/slowdns/
-echo -e "FINISHING..."
-finish_ist () {
-iptables -I INPUT -p udp --dport 5300 -j ACCEPT
-iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
-./startdns
-cd
-}
-fun_bar 'finish_ist'
-clear
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────────── /// ────────────────── ${YELLOW}"
-figlet -p -f slant SlowDNS
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ─────────────── SlowDNS ──────────────── ${YELLOW}"
-echo -e "${GREEN} INSTALLATION COMPLETED!"
-echo ""
-echo -ne "${YELLOW}YOUR NS: ${WHITE} " && cat /etc/slowdns/infons
-echo ""
-echo -ne "${YELLOW}YOUR PUBLIC KEY:\033[0m " && cat /root/server.pub
-echo ""
-echo -e "${YELLOW}YOUR KEY is saved in the file /root/server.pub\033[0m"
-echo -e "${YELLOW}Keep it in a safe place, you may need it in the future!${YELLOW}"
-echo ""
-read -p "Press [Enter] to return to the menu or CTRL+C to exit"
-}
-OptionX () {
-exit
-}
-key
-else
-echo -e "There is no key in the logs"
-echo ""
-key_gen () {
-echo "How do you want to get your key?"
-echo ""
-echo "[ 1 ] | Generate on installation"
-echo "[ 2 ] | Use the default key"
-echo "[ x ] | Abort installation"
-echo ""
-echo -ne "Enter an option: " && read opc_key
-case $opc_key in
-1) opc_key1 ;;
-2) opc_key2 ;;
-x) opc_keyx ;;
-*) "Unknown command" ; echo ; key_gen;;
-esac
-}
-opc_key1 () {
-echo "Generating your key..."
-cd /etc/slowdns/
-./dns-server -gen-key -privkey-file /root/server.key -pubkey-file /root/server.pub
-echo -e "FINISHING..."
-finish_ist () {
-iptables -I INPUT -p udp --dport 5300 -j ACCEPT
-iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
-./startdns
-cd
-}
-fun_bar 'finish_ist'
-clear
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────────── /// ────────────────── ${YELLOW}"
-figlet -p -f slant SlowDNS
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ─────────────── SlowDNS ──────────────── ${YELLOW}"
-echo -e "${GREEN} INSTALLATION COMPLETED!"
-echo ""
-echo -ne "${YELLOW}YOUR NS: ${WHITE} " && cat /etc/slowdns/infons
-echo ""
-echo -ne "${YELLOW}YOUR PUBLIC KEY:\033[0m " && cat /root/server.pub
-echo ""
-echo -e "${YELLOW}YOUR KEY is saved in the file /root/server.pub\033[0m"
-echo -e "${YELLOW}Keep it in a safe place, you may need it in the future!${YELLOW}"
-echo ""
-read -p "Press [Enter] to return to the menu or CTRL+C to exit"
-}
-opc_key2 () {
-echo -e "Downloading default key pair..."
-cd
-wget https://raw.githubusercontent.com/powermx/dnstt/main/server.key
-wget https://raw.githubusercontent.com/powermx/dnstt/main/server.pub
-sleep 1
-echo -e "Download Completed"
-sleep 1
-cd /etc/slowdns/
-echo -e "FINISHING..."
-finish_ist () {
-iptables -I INPUT -p udp --dport 5300 -j ACCEPT
-iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
-./startdns
-cd
-}
-fun_bar 'finish_ist'
-clear
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────────── /// ────────────────── ${YELLOW}"
-figlet -p -f slant SlowDNS
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ─────────────── SlowDNS ──────────────── ${YELLOW}"
-echo -e "${GREEN} INSTALLATION COMPLETED!"
-echo ""
-echo -ne "${YELLOW}YOUR NS: ${WHITE} " && cat /etc/slowdns/infons
-echo ""
-echo -ne "${YELLOW}YOUR PUBLIC KEY:\033[0m " && cat /root/server.pub
-echo ""
-echo -e "${YELLOW}YOUR KEY is saved in the file /root/server.pub\033[0m"
-echo -e "${YELLOW}Keep it in a safe place, you may need it in the future!${YELLOW}"
-echo ""
-read -p "Press [Enter] to return to the menu or CTRL+C to exit"
-}
-opc_keyx () {
-echo "Aborting installation"
-sleep 2
-slowdns
-}
-key_gen
+    echo -e "#!/bin/bash\n\nexit 0" > "$RC_LOCAL"
+    chmod +x "$RC_LOCAL"
 fi
 
+LINE1='iptables -C INPUT -p udp --dport 5300 -j ACCEPT 2>/dev/null || iptables -I INPUT -p udp --dport 5300 -j ACCEPT'
+LINE2='iptables -t nat -C PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300 2>/dev/null || iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300'
+LINE3='cd /etc/slowdns && ./startdns'
+
+grep -Fxq "$LINE3" "$RC_LOCAL" || sed -i "/^exit 0/i $LINE1\n$LINE2\n$LINE3" "$RC_LOCAL"
+}
+
+echo "Configurando inicio automático..."
+fun_bar configurar_rc
+
+# Pedir Nameserver
+echo ""
+read -p "Ingresa tu Nameserver (NS): " nameserver
+echo "$nameserver" > /etc/slowdns/infons
+
+# Descargar start y restart SSH
+descargar_scripts() {
+cd /etc/slowdns
+wget -q https://raw.githubusercontent.com/powermx/dnstt/main/ssh/startdns
+wget -q https://raw.githubusercontent.com/powermx/dnstt/main/ssh/restartdns
+chmod +x startdns restartdns
+sed -i "s;1234;$nameserver;g" startdns restartdns
+cp startdns restartdns /bin/
+}
+
+echo "Descargando scripts SSH..."
+fun_bar descargar_scripts
+
+# Función configurar firewall
+configurar_firewall() {
+iptables -C INPUT -p udp --dport 5300 -j ACCEPT 2>/dev/null || \
+iptables -I INPUT -p udp --dport 5300 -j ACCEPT
+
+iptables -t nat -C PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300 2>/dev/null || \
+iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
+}
+
+# Verificar claves
+cd /root
+
+if [[ -f server.key && -f server.pub ]]; then
+    echo ""
+    echo "Se encontraron claves existentes."
+    echo "[1] Usar claves actuales"
+    echo "[2] Generar nuevas claves"
+    echo "[3] Usar claves por defecto"
+    echo "[x] Cancelar"
+    read -p "Selecciona una opción: " opcion
+else
+    echo ""
+    echo "No se encontraron claves."
+    echo "[1] Generar nuevas claves"
+    echo "[2] Usar claves por defecto"
+    echo "[x] Cancelar"
+    read -p "Selecciona una opción: " opcion
+fi
+
+case $opcion in
+
+1)
+    echo "Usando claves actuales..."
+;;
+
+2)
+    echo "Generando nuevas claves..."
+    rm -f server.key server.pub
+    cd /etc/slowdns
+    ./dns-server -gen-key -privkey-file /root/server.key -pubkey-file /root/server.pub
+;;
+
+3)
+    echo "Descargando claves por defecto..."
+    cd /root
+    wget -q https://raw.githubusercontent.com/powermx/dnstt/main/server.key
+    wget -q https://raw.githubusercontent.com/powermx/dnstt/main/server.pub
+;;
+
+x)
+    echo "Instalación cancelada."
+    exit
+;;
+
+*)
+    echo "Opción inválida."
+    exit
+;;
+
+esac
+
+# Copiar claves
+cp /root/server.key /root/server.pub /etc/slowdns/
+
+# Configurar firewall
+configurar_firewall
+
+# Iniciar servicio
+cd /etc/slowdns
+./startdns
+
+clear
+echo -e "${GREEN}INSTALACIÓN COMPLETADA ✔${RESET}"
+echo ""
+echo -e "${YELLOW}Tu NS:${RESET} $(cat /etc/slowdns/infons)"
+echo ""
+echo -e "${YELLOW}Tu clave pública:${RESET}"
+cat /root/server.pub
+echo ""
+echo -e "${YELLOW}Archivo guardado en:${RESET} /root/server.pub"
+echo ""
+read -p "Presiona ENTER para continuar..."
+slowdns
