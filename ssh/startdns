@@ -1,42 +1,54 @@
 #!/bin/bash
 clear
-fun_bar () {
-comando[0]="$1"
-comando[1]="$2"
- (
-[[ -e $HOME/fim ]] && rm $HOME/fim
-${comando[0]} -y > /dev/null 2>&1
-${comando[1]} -y > /dev/null 2>&1
-touch $HOME/fim
- ) > /dev/null 2>&1 &
- tput civis
-echo -ne "  \033[1;33mWAIT \033[1;37m- \033[1;33m["
-while true; do
-   for((i=0; i<18; i++)); do
-   echo -ne "\033[1;31m#"
-   sleep 0.1s
-   done
-   [[ -e $HOME/fim ]] && rm $HOME/fim && break
-   echo -e "\033[1;33m]"
-   sleep 1s
-   tput cuu1
-   tput dl1
-   echo -ne "  \033[1;33mWAIT \033[1;37m- \033[1;33m["
-done
-echo -e "\033[1;33m]\033[1;37m -\033[1;32m OK !\033[1;37m"
-tput cnorm
+
+echo "====================================="
+echo "        INICIANDO SLOWDNS"
+echo "====================================="
+
+fun_bar() {
+    (
+        $1 > /dev/null 2>&1
+        touch $HOME/fim
+    ) &
+
+    tput civis
+    echo -ne "  ESPERANDO ["
+    while true; do
+        for((i=0; i<18; i++)); do
+            echo -ne "#"
+            sleep 0.1
+        done
+        [[ -e $HOME/fim ]] && rm $HOME/fim && break
+        echo -ne "]"
+        sleep 1
+        tput cuu1
+        tput dl1
+        echo -ne "  ESPERANDO ["
+    done
+    echo -e "] OK"
+    tput cnorm
 }
-echo "STARTING SLOWDNS"
-fun_start () {
-nameserver='1234'
-cd /etc/slowdns
-screen -dmS slowdns /etc/slowdns/dns-server -udp :5300 -privkey-file /root/server.key $nameserver 127.0.0.1:22
-sleep 1
+
+fun_start() {
+
+    # Verificar si ya está corriendo
+    if pgrep -f dns-server > /dev/null; then
+        echo "SlowDNS ya está en ejecución."
+        exit 0
+    fi
+
+    cd /etc/slowdns || exit 1
+
+    screen -dmS slowdns ./dns-server -udp :5300 \
+    -privkey-file /root/server.key \
+    1234 127.0.0.1:22
 }
-fun_bar 'fun_start'
+
+fun_bar fun_start
+
 echo ""
-echo "       SLOWDNS STARTED SUCCESSFULLY!!!"
-sleep 2
-echo -e "\033[1;33m › PRESS ENTER TO CONTINUE\033[0m"
-read -p " "
+echo "✔ SlowDNS iniciado correctamente"
+echo ""
+read -p "Presiona ENTER para continuar..."
+
 slowdns
