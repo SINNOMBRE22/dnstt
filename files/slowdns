@@ -1,56 +1,72 @@
-#!/bin/bash
+#!/usr/bin/env bash
 clear
-#——————————————————
-# CLIENTE SLOWDNS TERMUX
-# Modificado y corregido
-#——————————————————
+# ==================================================
+# CLIENTE SLOWDNS TERMUX - SINNOMBRE22 PRO
+# ==================================================
 
-RED='\033[1;31m'
-GREEN='\033[1;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[1;34m'
-SCOLOR='\033[0m'
+# 📌 COLORES OFICIALES
+R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'
+W='\033[1;37m'; CYAN='\033[0;36m'; RESET='\033[0m'
+BOLD='\033[1m'
+ROJO="\e[31m"; BLANCO="\e[97m"
+
+LINEA="${ROJO}══════════════════════════ / / / ══════════════════════════${RESET}"
 
 banner='
- ___ _    _____      _____  _  _ ___ 
-/ __| |  / _ \ \    / /   \| \| / __|
-\__ \ |_| (_) \ \/\/ /| |) | .  \__ \
-|___/____\___/ \_/\_/ |___/|_|\_|___/
+   _____ _      ____  _     ____  _   _ ____  
+  / ____| |    / __ \| |   |  _ \| \ | / __ \ 
+ | (___ | |   | |  | | |   | |_) |  \| | |  | |
+  \___ \| |   | |  | | |   |  _ <| . ` | |  | |
+  ____) | |___| |__| | |___| |_) | |\  | |__| |
+ |_____/|______\____/|_____|____/|_| \_|\____/ 
 '
 
-echo -e "${BLUE}=====================================${SCOLOR}"
-echo -e "${BLUE}        CLIENTE SSHPLUS SLOWDNS     ${SCOLOR}"
-echo -e "${BLUE}=====================================${SCOLOR}"
-echo -e "${RED}$banner${SCOLOR}"
+# ==================================================
+# TÍTULO
+# ==================================================
+echo -e "$LINEA"
+echo -e "${BOLD}${BLANCO}           CLIENTE SSHPLUS SLOWDNS - SINNOMBRE22           ${RESET}"
+echo -e "$LINEA"
+echo -e "${R}$banner${RESET}"
 
-# Instalar script dns si no existe
+# ==================================================
+# DESCARGAR COMPONENTE DNS
+# ==================================================
 if [[ ! -f "$HOME/dns" ]]; then
-    echo -e "\n${YELLOW}Descargando componente DNS...${SCOLOR}"
+    echo -e "\n${Y}Descargando componente DNS...${RESET}"
     pkg install curl -y > /dev/null 2>&1
     curl -s -o $HOME/dns https://raw.githubusercontent.com/khaledagn/DNS-AGN/main/files/dns
     chmod +x $HOME/dns
-    echo -e "${GREEN}Componente descargado correctamente.${SCOLOR}"
+
+    if [[ -f "$HOME/dns" ]]; then
+        echo -e "${G}✔ Componente descargado correctamente${RESET}"
+    else
+        echo -e "${R}✖ Error al descargar componente DNS${RESET}"
+        exit 1
+    fi
 fi
 
-# Configurar credenciales
+# ==================================================
+# CONFIGURAR CREDENCIALES
+# ==================================================
 if [[ ! -f "$HOME/credenciales" ]]; then
     ns="$1"
     chave="$2"
 
     if [[ -z "$ns" || -z "$chave" ]]; then
-        echo -e "\n${RED}Uso correcto:${SCOLOR}"
-        echo -e "${YELLOW}slowdns <NS> <CLAVE_PUBLICA> [DNS_IP]${SCOLOR}"
+        echo -e "\n${R}Uso correcto:${RESET}"
+        echo -e "${Y}slowdns <NS> <CLAVE_PUBLICA> [DNS_IP]${RESET}"
         exit 1
     fi
 
     echo -e "$ns\n$chave" > $HOME/credenciales
 else
-    echo -e "\n${YELLOW}El script ya está configurado.${SCOLOR}"
-    read -p "$(echo -e "${GREEN}¿Desea continuar con la misma configuración? (s/n): ${SCOLOR}")" opc
+    echo -e "\n${Y}Configuración detectada${RESET}"
+    read -p "$(echo -e "${G}¿Desea continuar con la misma configuración? (s/n): ${RESET}")" opc
 
     if [[ ! "$opc" =~ ^(s|S|si|SI)$ ]]; then
         rm -f $HOME/credenciales
-        echo -e "${RED}Configuración eliminada. Ejecute nuevamente con los datos.${SCOLOR}"
+        echo -e "${R}Configuración eliminada. Ejecute nuevamente con los datos.${RESET}"
         exit 0
     fi
 
@@ -58,26 +74,33 @@ else
     chave=$(sed -n 2p $HOME/credenciales)
 fi
 
-# DNS por defecto
+# ==================================================
+# DNS POR DEFECTO
+# ==================================================
 dns="$3"
 [[ -z "$dns" ]] && dns="8.8.8.8"
 
-echo -e "\n${YELLOW}IMPORTANTE:${SCOLOR}"
-echo -e "${GREEN}Active únicamente los DATOS MÓVILES antes de continuar.${SCOLOR}"
+echo -e "\n${Y}IMPORTANTE:${RESET}"
+echo -e "${G}Active únicamente los DATOS MÓVILES antes de continuar${RESET}"
 read -p "Presione ENTER para conectar..."
 
-# Iniciar SlowDNS
+# ==================================================
+# INICIAR SLOWDNS
+# ==================================================
 $HOME/dns -udp ${dns}:53 -pubkey ${chave} ${ns} 127.0.0.1:2222 > /dev/null 2>&1 &
 PID_DNS=$!
 
 sleep 2
 
 if ps -p $PID_DNS > /dev/null 2>&1; then
-    echo -e "\n${GREEN}✔ SlowDNS iniciado correctamente.${SCOLOR}"
-    echo -e "${YELLOW}Ahora conecte su app VPN.${SCOLOR}"
+    echo -e "\n${G}✔ SlowDNS iniciado correctamente${RESET}"
+    echo -e "${Y}Ahora conecte su aplicación VPN${RESET}"
     read -p "Presione ENTER para desconectar..."
+
     kill $PID_DNS > /dev/null 2>&1
-    echo -e "${RED}Conexión detenida.${SCOLOR}"
+    echo -e "${R}✖ Conexión detenida${RESET}"
 else
-    echo -e "\n${RED}Error al iniciar SlowDNS.${SCOLOR}"
+    echo -e "\n${R}✖ Error al iniciar SlowDNS${RESET}"
 fi
+
+echo -e "$LINEA"
