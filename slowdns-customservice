@@ -1,61 +1,82 @@
 #!/bin/bash
 
-# Verificar root
+# =============================
+# VERIFICAR ROOT
+# =============================
 if [[ $EUID -ne 0 ]]; then
-    echo "Este script debe ejecutarse como root"
-    exit 1
+   echo "Este script debe ejecutarse como root"
+   exit 1
 fi
 
 clear
 
-# Colores
-RED='\033[1;31m'
-GREEN='\033[1;32m'
-YELLOW='\033[1;33m'
-WHITE='\033[1;37m'
-RESET='\033[0m'
+# =============================
+# COLORES OFICIALES
+# =============================
+R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'; B='\033[0;34m'
+M='\033[0;35m'; C='\033[0;36m'; W='\033[1;37m'; N='\033[0m'
+BOLD='\033[1m'
+ROJO="\e[31m"; BLANCO="\e[97m"; CYAN="\e[36m"; AMARILLO="\e[33m"; RESET="\e[0m"
 
-# Barra limpia
+LINEA="${ROJO}══════════════════════════ / / / ══════════════════════════${RESET}"
+
+# =============================
+# BARRA OFICIAL
+# =============================
 fun_bar() {
     (
         eval "$1" > /dev/null 2>&1
         touch $HOME/fim
     ) &
+
     tput civis
-    echo -ne "  PROCESANDO ["
+    echo -ne "  ${CYAN}PROCESANDO${RESET} ${ROJO}["
     while true; do
         for ((i=0;i<18;i++)); do
-            echo -ne "#"
+            echo -ne "${ROJO}#${RESET}"
             sleep 0.1
         done
         [[ -e $HOME/fim ]] && rm $HOME/fim && break
-        echo -ne "]"
+        echo -ne "${ROJO}]${RESET}"
         sleep 1
         tput cuu1 && tput dl1
-        echo -ne "  PROCESANDO ["
+        echo -ne "  ${CYAN}PROCESANDO${RESET} ${ROJO}["
     done
-    echo -e "] OK"
+    echo -e "${ROJO}]${RESET} ${G}OK${RESET}"
     tput cnorm
 }
 
-echo -e "${RED}════════════════════════════════════════════${RESET}"
-echo -e "${GREEN} INSTALADOR SLOWDNS SERVICIO PERSONALIZADO${RESET}"
-echo -e "${RED}════════════════════════════════════════════${RESET}"
+# =============================
+# ENCABEZADO
+# =============================
+echo -e "$LINEA"
+echo -e "${BOLD}${BLANCO}     INSTALADOR SLOWDNS SERVICIO PERSONALIZADO     ${RESET}"
+echo -e "$LINEA"
 echo ""
 
-echo "Actualizando sistema..."
+# =============================
+# ACTUALIZAR SISTEMA
+# =============================
+echo -e "${AMARILLO}Actualizando sistema...${RESET}"
 fun_bar "apt update -y && apt upgrade -y"
 
-echo "Instalando dependencias..."
+# =============================
+# INSTALAR DEPENDENCIAS
+# =============================
+echo -e "${AMARILLO}Instalando dependencias...${RESET}"
 fun_bar "apt install screen cron iptables wget -y"
 
-# Crear carpeta
 mkdir -p /etc/slowdns
 
-echo "Descargando binario DNSTT..."
-fun_bar "cd /etc/slowdns && wget -q https://github.com/powermx/dnstt/raw/main/dns-server && chmod +x dns-server"
+# =============================
+# DESCARGAR DNSTT
+# =============================
+echo -e "${AMARILLO}Descargando binario DNSTT...${RESET}"
+fun_bar "cd /etc/slowdns && wget -q https://github.com/SINNOMBRE22/dnstt/raw/main/dns-server && chmod +x dns-server"
 
-# Firewall seguro
+# =============================
+# FIREWALL
+# =============================
 configurar_firewall() {
 iptables -C INPUT -p udp --dport 5300 -j ACCEPT 2>/dev/null || \
 iptables -I INPUT -p udp --dport 5300 -j ACCEPT
@@ -63,10 +84,12 @@ iptables -I INPUT -p udp --dport 5300 -j ACCEPT
 iptables -t nat -C PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300 2>/dev/null || \
 iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
 }
-
+echo -e "${AMARILLO}Configurando firewall...${RESET}"
 fun_bar configurar_firewall
 
-# Configurar inicio automático sin romper rc.local
+# =============================
+# INICIO AUTOMÁTICO
+# =============================
 configurar_inicio() {
 RC="/etc/rc.local"
 if [ ! -f "$RC" ]; then
@@ -76,8 +99,12 @@ fi
 LINE='cd /etc/slowdns && ./startdns'
 grep -Fxq "$LINE" "$RC" || sed -i "/^exit 0/i $LINE" "$RC"
 }
+echo -e "${AMARILLO}Configurando inicio automático...${RESET}"
 fun_bar configurar_inicio
 
+# =============================
+# CONFIGURACIÓN PERSONALIZADA
+# =============================
 echo ""
 read -p "Ingresa tu NS (Nameserver): " nameserver
 echo "$nameserver" > /etc/slowdns/infons
@@ -86,7 +113,7 @@ echo ""
 read -p "Ingresa el puerto del servicio (NO usar 53 ni 5300): " customport
 
 if [[ "$customport" == "53" || "$customport" == "5300" ]]; then
-    echo -e "${RED}ERROR: No puedes usar el puerto 53 ni 5300${RESET}"
+    echo -e "${ROJO}ERROR: No puedes usar el puerto 53 ni 5300${RESET}"
     exit 1
 fi
 
@@ -110,30 +137,37 @@ cp /etc/slowdns/restartdns /bin/
 
 cd /root
 
-# Manejo de claves
+# =============================
+# CLAVES
+# =============================
 if [[ ! -f server.key || ! -f server.pub ]]; then
-    echo "Generando nuevas claves..."
+    echo -e "${AMARILLO}Generando nuevas claves...${RESET}"
     cd /etc/slowdns
     ./dns-server -gen-key -privkey-file /root/server.key -pubkey-file /root/server.pub
 fi
 
 cp /root/server.key /root/server.pub /etc/slowdns/
 
-# Iniciar servicio
+# =============================
+# INICIAR SERVICIO
+# =============================
 cd /etc/slowdns
 ./startdns
 
 clear
-echo -e "${GREEN}INSTALACIÓN COMPLETADA ✔${RESET}"
 echo ""
-echo -e "${YELLOW}Tu NS:${WHITE} $(cat /etc/slowdns/infons)"
+echo -e "$LINEA"
+echo -e "${G}                 ✔ INSTALACIÓN COMPLETADA                 ${RESET}"
+echo -e "$LINEA"
 echo ""
-echo -e "${YELLOW}Tu clave pública:${WHITE}"
+echo -e "${AMARILLO}Tu NS:${RESET} $(cat /etc/slowdns/infons)"
+echo ""
+echo -e "${AMARILLO}Tu clave pública:${RESET}"
 cat /root/server.pub
 echo ""
-echo -e "${YELLOW}Puerto configurado:${WHITE} $customport"
+echo -e "${AMARILLO}Puerto configurado:${RESET} $customport"
 echo ""
-echo -e "${YELLOW}La clave está guardada en:${WHITE} /root/server.pub"
+echo -e "${AMARILLO}La clave está guardada en:${RESET} /root/server.pub"
 echo ""
 read -p "Presiona ENTER para volver al menú..."
 slowdns
