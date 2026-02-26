@@ -23,7 +23,7 @@ banner='
 # TÍTULO
 # ==================================================
 echo -e "$LINEA"
-echo -e "${BOLD}${BLANCO}           CLIENTE SSHPLUS SLOWDNS - SINNOMBRE22           ${RESET}"
+echo -e "${BOLD}${BLANCO}           CLIENTE SN Manager SLOWDNS - SINNOMBRE22           ${RESET}"
 echo -e "$LINEA"
 echo -e "${R}$banner${RESET}"
 
