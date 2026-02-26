@@ -68,7 +68,7 @@ fun_remove() {
 
     cd /root || exit 1
 
-    wget -q https://raw.githubusercontent.com/SINNOMBRE 22/dnstt/main/remove-slow -O remove-slow
+    wget -q https://raw.githubusercontent.com/SINNOMBRE22/dnstt/main/remove-slow -O remove-slow
     chmod +x remove-slow
     bash remove-slow
 
@@ -94,7 +94,7 @@ fun_update() {
 
     cd /root || exit 1
 
-    wget -q https://raw.githubusercontent.com/SINNOMBRE 22/dnstt/main/install -O install
+    wget -q https://raw.githubusercontent.com/SINNOMBRE22/dnstt/main/install -O install
     chmod +x install
     bash install
 }
