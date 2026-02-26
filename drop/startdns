@@ -1,9 +1,22 @@
-#!/bin/bash
-# Iniciar SlowDNS - Versión Corregida
+#!/usr/bin/env bash
+# Iniciar SlowDNS - SINNOMBRE22 PRO
 
 clear
 
-fun_bar () {
+# ==================================================
+# 📌 COLORES OFICIALES
+# ==================================================
+R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'
+W='\033[1;37m'; CYAN='\033[0;36m'; RESET='\033[0m'
+BOLD='\033[1m'
+ROJO="\e[31m"; BLANCO="\e[97m"
+
+LINEA="${ROJO}══════════════════════════ / / / ══════════════════════════${RESET}"
+
+# ==================================================
+# 📌 BARRA OFICIAL
+# ==================================================
+barra_progreso() {
 comando="$1"
 (
 [[ -e $HOME/fim ]] && rm $HOME/fim
@@ -12,41 +25,45 @@ touch $HOME/fim
 ) > /dev/null 2>&1 &
 
 tput civis
-echo -ne "  \033[1;33mINICIANDO \033[1;37m- \033[1;33m["
-
+echo -ne "${CYAN}ESPERANDO ${ROJO}["
 while true; do
    for((i=0; i<18; i++)); do
-      echo -ne "\033[1;31m#"
-      sleep 0.1s
+      echo -ne "#"
+      sleep 0.08
    done
    [[ -e $HOME/fim ]] && rm $HOME/fim && break
-   echo -e "\033[1;33m]"
+   echo -e "]"
    sleep 1
    tput cuu1
    tput dl1
-   echo -ne "  \033[1;33mINICIANDO \033[1;37m- \033[1;33m["
+   echo -ne "${CYAN}ESPERANDO ${ROJO}["
 done
-
-echo -e "\033[1;33m]\033[1;37m - \033[1;32mOK!\033[0m"
+echo -e "] ${G}OK${RESET}"
 tput cnorm
 }
 
-echo "═══════════════════════════════"
-echo "       INICIANDO SLOWDNS"
-echo "═══════════════════════════════"
+# ==================================================
+# 📌 TÍTULO
+# ==================================================
+echo -e "$LINEA"
+echo -e "${BOLD}${BLANCO}           INICIANDO SLOWDNS - SINNOMBRE22           ${RESET}"
+echo -e "$LINEA"
 
+# ==================================================
+# FUNCIÓN START
+# ==================================================
 fun_start () {
 
 # Verificar instalación
 if [ ! -f /etc/slowdns/dns-server ]; then
-   echo "SlowDNS no está instalado."
+   echo -e "${R}✖ SlowDNS no está instalado${RESET}"
    sleep 2
    exit 1
 fi
 
 # Verificar si ya está activo
 if pgrep -f dns-server > /dev/null; then
-   echo "SlowDNS ya está en ejecución."
+   echo -e "${Y}⚠ SlowDNS ya está en ejecución${RESET}"
    sleep 2
    return
 fi
@@ -55,18 +72,18 @@ fi
 if [ -f /etc/slowdns/infons ]; then
    nameserver=$(cat /etc/slowdns/infons)
 else
-   echo "No se encontró el NS configurado."
+   echo -e "${R}✖ No se encontró el NS configurado${RESET}"
    exit 1
 fi
 
-# Detectar puerto configurado automáticamente
+# Detectar puerto automáticamente
 if [ -f /etc/slowdns/startdns ]; then
    custom_port=$(grep 127.0.0.1 /etc/slowdns/startdns | awk -F':' '{print $NF}')
 else
    custom_port="8080"
 fi
 
-cd /etc/slowdns
+cd /etc/slowdns || exit 1
 
 screen -dmS slowdns /etc/slowdns/dns-server \
 -udp :5300 \
@@ -76,12 +93,15 @@ $nameserver 127.0.0.1:$custom_port
 sleep 2
 }
 
-fun_bar fun_start
+# ==================================================
+# EJECUTAR
+# ==================================================
+barra_progreso fun_start
 
-echo ""
-echo -e "\033[1;32mSlowDNS iniciado correctamente ✔\033[0m"
-echo ""
-echo -e "\033[1;33m › PRESIONE ENTER PARA CONTINUAR\033[0m"
+echo
+echo -e "${G}✔ SlowDNS iniciado correctamente${RESET}"
+echo
+echo -e "${Y}› PRESIONE ENTER PARA CONTINUAR${RESET}"
 read -p " "
 
 slowdns
