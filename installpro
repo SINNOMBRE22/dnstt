@@ -2,18 +2,18 @@
 export DEBIAN_FRONTEND=noninteractive
 set -e
 
-# Colores de texto
+# ===== COLORES =====
 RED='\033[1;31m'
 GREEN='\033[1;32m'
 YELLOW='\033[1;33m'
 WHITE='\033[1;37m'
 GRAY='\033[0;37m'
+CYAN='\033[1;36m'
 RESET='\033[0m'
 
-# Limpiar pantalla
 clear
 
-# Barra de progreso
+# ===== BARRA DE PROGRESO =====
 fun_bar () {
   comando="$1"
   (
@@ -23,94 +23,128 @@ fun_bar () {
   ) > /dev/null 2>&1 &
 
   tput civis
-  echo -ne "  ${YELLOW}WAIT ${WHITE}- ${YELLOW}["
+  echo -ne "  ${YELLOW}PROCESANDO ${WHITE}- ${YELLOW}["
   while true; do
     for ((i = 0; i < 18; i++)); do
-      echo -ne "${RED}#"
+      echo -ne "${GREEN}#"
       sleep 0.1
     done
     [[ -e $HOME/fim ]] && rm $HOME/fim && break
     echo -e "${YELLOW}]"
     sleep 1
-    tput cuu1
-    tput dl1
-    echo -ne "  ${YELLOW}WAIT ${WHITE}- ${YELLOW}["
+    tput cuu1 && tput dl1
+    echo -ne "  ${YELLOW}PROCESANDO ${WHITE}- ${YELLOW}["
   done
-  echo -e "${YELLOW}]${WHITE} -${GREEN} OK !${WHITE}"
+  echo -e "${YELLOW}]${WHITE} - ${GREEN}OK!${RESET}"
   tput cnorm
 }
 
-# Título
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────────── /// ────────────────── ${YELLOW}"
-command -v figlet >/dev/null 2>&1 || apt install figlet -y > /dev/null
-figlet -p -f slant SlowDNS
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ────────────── Installer ─────────────── ${YELLOW}\n"
-echo -e "      This script will install SlowDNS connection mode.\n"
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────────── /// ────────────────── ${YELLOW}\n"
+# ===== INSTALACIÓN =====
+instalar_slowdns() {
 
-echo -e "DOWNLOADING DEPENDENCIES...\n"
+  clear
+  echo -e "${CYAN}Instalando SlowDNS...${RESET}\n"
 
-apt install ncurses-bin -y > /dev/null 2>&1
-mkdir -p /etc/slowdns
-cd /etc/slowdns
-base_url="https://raw.githubusercontent.com/powermx/dnstt/main"
+  apt update -y > /dev/null 2>&1
+  apt install wget figlet firewalld ncurses-bin -y > /dev/null 2>&1
 
-wget -q https://github.com/powermx/dnstt/raw/main/dns-server -O dns-server && chmod +x dns-server
+  mkdir -p /etc/slowdns
+  cd /etc/slowdns
 
-for file in \
-  remove-slow slowdns-info slowdns-drop slowdns-ssh slowdns-ssl \
-  slowdns-socks slowdns-customservice stopdns; do
-  wget -q "${base_url}/${file}" -O "${file}" && chmod +x "${file}"
-done
+  base_url="https://raw.githubusercontent.com/powermx/dnstt/main"
 
-wget -q "${base_url}/slowdns" -O /bin/slowdns && chmod +x /bin/slowdns
+  wget -q https://github.com/powermx/dnstt/raw/main/dns-server -O dns-server
+  chmod +x dns-server
 
-echo -e "\nCONFIGURING FIREWALL...\n"
-
-fun_ports () {
-  apt install firewalld -y
-  ports=(80 8080 443 85 53 5300 2222)
-  for port in "${ports[@]}"; do
-    if [[ "$port" == "53" || "$port" == "5300" ]]; then
-      proto="udp"
-    else
-      proto="tcp"
-    fi
-    firewall-cmd --zone=public --permanent --add-port=${port}/${proto}
+  for file in \
+    remove-slow slowdns-info slowdns-drop slowdns-ssh slowdns-ssl \
+    slowdns-socks slowdns-customservice stopdns; do
+    wget -q "${base_url}/${file}" -O "${file}"
+    chmod +x "${file}"
   done
-  firewall-cmd --reload
-}
 
-fun_bar fun_ports
+  wget -q "${base_url}/slowdns" -O /bin/slowdns
+  chmod +x /bin/slowdns
 
-echo -e "\nSETTING CLOUDFLARE DNS...\n"
+  configurar_puertos
+  configurar_dns
 
-fun_dnscf () {
-  systemctl disable systemd-resolved.service
-  systemctl stop systemd-resolved.service
-  mv /etc/resolv.conf /etc/resolv.conf.bkp 2>/dev/null || true
-  echo "nameserver 1.1.1.1" > /etc/resolv.conf
-  systemctl enable systemd-resolved.service
-  systemctl start systemd-resolved.service
+  clear
+  echo -e "${GREEN}✔ SlowDNS instalado correctamente${RESET}\n"
   sleep 2
+  slowdns
 }
 
-fun_bar fun_dnscf
+# ===== FIREWALL =====
+configurar_puertos() {
+  fun_ports () {
+    systemctl enable firewalld > /dev/null 2>&1
+    systemctl start firewalld > /dev/null 2>&1
 
-# Final
-clear
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ───────────────── /// ────────────────── ${YELLOW}"
-figlet -p -f slant SlowDNS
-echo -e "${GRAY}[${RED}-${GRAY}]${RED} ────────────── Installer ─────────────── ${YELLOW}\n"
-echo -e "          ${YELLOW}INSTALLATION COMPLETED${RESET}\n"
-echo -e "To open the menu, use the command: ${RED}slowdns${RESET}\n"
+    ports=(80 8080 443 85 53 5300 2222)
+    for port in "${ports[@]}"; do
+      if [[ "$port" == "53" || "$port" == "5300" ]]; then
+        proto="udp"
+      else
+        proto="tcp"
+      fi
+      firewall-cmd --zone=public --permanent --add-port=${port}/${proto} > /dev/null 2>&1
+    done
+    firewall-cmd --reload > /dev/null 2>&1
+  }
 
-cd
-sleep 3
+  echo -e "${YELLOW}Configurando firewall...${RESET}"
+  fun_bar fun_ports
+}
 
-# Ejecutar si slowdns fue correctamente instalado
-if command -v slowdns >/dev/null 2>&1; then
-  slowdns
-else
-  echo -e "${RED}Error: 'slowdns' command not found.${RESET}"
-fi
+# ===== DNS CLOUDFLARE =====
+configurar_dns() {
+  fun_dnscf () {
+    systemctl stop systemd-resolved.service > /dev/null 2>&1 || true
+    mv /etc/resolv.conf /etc/resolv.conf.bkp 2>/dev/null || true
+    echo "nameserver 1.1.1.1" > /etc/resolv.conf
+    systemctl start systemd-resolved.service > /dev/null 2>&1 || true
+  }
+
+  echo -e "${YELLOW}Configurando DNS Cloudflare...${RESET}"
+  fun_bar fun_dnscf
+}
+
+# ===== MENÚ PRINCIPAL =====
+menu_instalador() {
+
+  clear
+  command -v figlet >/dev/null 2>&1 || apt install figlet -y > /dev/null 2>&1
+
+  echo -e "${GRAY}────────────────────────────────${RESET}"
+  figlet -f slant SlowDNS
+  echo -e "${GRAY}──────── Instalador Oficial ────────${RESET}\n"
+
+  if command -v slowdns >/dev/null 2>&1; then
+    echo -e "${GREEN}✔ SlowDNS ya está instalado${RESET}\n"
+    echo -e "${YELLOW}1) Abrir menú SlowDNS"
+    echo -e "0) Regresar${RESET}\n"
+    read -p "Seleccione una opción: " op
+
+    case $op in
+      1) slowdns ;;
+      0) exit ;;
+      *) menu_instalador ;;
+    esac
+
+  else
+    echo -e "${RED}✘ SlowDNS no está instalado${RESET}\n"
+    echo -e "${YELLOW}1) Instalar SlowDNS"
+    echo -e "0) Regresar${RESET}\n"
+    read -p "Seleccione una opción: " op
+
+    case $op in
+      1) instalar_slowdns ;;
+      0) exit ;;
+      *) menu_instalador ;;
+    esac
+  fi
+}
+
+# ===== EJECUCIÓN =====
+menu_instalador
