@@ -3,6 +3,16 @@
 clear
 
 # =============================
+# COLORES
+# =============================
+R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'; B='\033[0;34m'
+M='\033[0;35m'; C='\033[0;36m'; W='\033[1;37m'; N='\033[0m'
+BOLD='\033[1m'
+ROJO="\e[31m"; BLANCO="\e[97m"; CYAN="\e[36m"; AMARILLO="\e[33m"; RESET="\e[0m"
+
+LINEA="${ROJO}══════════════════════════ / / / ══════════════════════════${RESET}"
+
+# =============================
 # BARRA DE PROGRESO
 # =============================
 fun_bar() {
@@ -12,40 +22,43 @@ fun_bar() {
     ) &
 
     tput civis
-    echo -ne "  ESPERANDO ["
+    echo -ne "  ${CYAN}ESPERANDO${RESET} ${ROJO}["
     while true; do
         for ((i=0; i<18; i++)); do
-            echo -ne "#"
+            echo -ne "${ROJO}#${RESET}"
             sleep 0.1
         done
         [[ -e $HOME/fim ]] && rm $HOME/fim && break
-        echo -ne "]"
+        echo -ne "${ROJO}]${RESET}"
         sleep 1
         tput cuu1
         tput dl1
-        echo -ne "  ESPERANDO ["
+        echo -ne "  ${CYAN}ESPERANDO${RESET} ${ROJO}["
     done
-    echo -e "] OK"
+    echo -e "${ROJO}]${RESET} ${G}OK${RESET}"
     tput cnorm
 }
 
 # =============================
 # AVISO
 # =============================
-echo "========================================"
-echo "        ATENCIÓN IMPORTANTE"
-echo "========================================"
+echo -e "$LINEA"
+echo -e "${BOLD}${BLANCO}        ATENCIÓN IMPORTANTE${RESET}"
+echo -e "$LINEA"
 echo ""
-echo "Al finalizar el proceso deberás"
-echo "configurar nuevamente el servicio SlowDNS."
+echo -e "${AMARILLO}Al finalizar el proceso deberás${RESET}"
+echo -e "${AMARILLO}configurar nuevamente el servicio SlowDNS.${RESET}"
 echo ""
-echo "Selecciona la opción:"
-echo "'Usar clave actual' para restaurar tu clave anterior."
+echo -e "${CYAN}Selecciona la opción:${RESET}"
+echo -e "${G}'Usar clave actual'${RESET} ${CYAN}para restaurar tu clave anterior.${RESET}"
 echo ""
+echo -e "$LINEA"
 read -p "Presiona [ENTER] para continuar o CTRL + C para cancelar"
 
-echo ""
-echo "ELIMINANDO ARCHIVOS ANTIGUOS..."
+clear
+echo -e "$LINEA"
+echo -e "${ROJO}ELIMINANDO ARCHIVOS ANTIGUOS...${RESET}"
+echo -e "$LINEA"
 echo ""
 
 # =============================
@@ -69,7 +82,9 @@ fun_remove() {
 fun_bar fun_remove
 
 echo ""
-echo "ACTUALIZANDO SCRIPT..."
+echo -e "$LINEA"
+echo -e "${Y}ACTUALIZANDO SCRIPT...${RESET}"
+echo -e "$LINEA"
 echo ""
 
 # =============================
@@ -89,10 +104,13 @@ fun_bar fun_update
 sleep 2
 
 echo ""
-echo "✔ SLOWDNS ACTUALIZADO CORRECTAMENTE"
+echo -e "$LINEA"
+echo -e "${G}✔ SLOWDNS ACTUALIZADO CORRECTAMENTE${RESET}"
+echo -e "$LINEA"
 echo ""
-echo "Para abrir el menú usa el comando:"
+echo -e "${CYAN}Para abrir el menú usa el comando:${RESET}"
 echo ""
-echo "   slowdns"
+echo -e "   ${BOLD}${BLANCO}slowdns${RESET}"
 echo ""
+echo -e "$LINEA"
 read -p "Presiona [ENTER] para finalizar..."
