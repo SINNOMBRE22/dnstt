@@ -1,55 +1,85 @@
-#!/bin/bash
+#!/usr/bin/env bash
+# Restart Simple SlowDNS - SINNOMBRE22
+
 clear
 
-echo "====================================="
-echo "        REINICIANDO SLOWDNS"
-echo "====================================="
+# ==================================================
+# 📌 COLORES OFICIALES
+# ==================================================
+R='\033[0;31m'; G='\033[0;32m'; Y='\033[1;33m'
+W='\033[1;37m'; CYAN='\033[0;36m'; RESET='\033[0m'
+BOLD='\033[1m'
+ROJO="\e[31m"; BLANCO="\e[97m"
 
-# Función barra simple
-fun_bar() {
-    (
-        $1 > /dev/null 2>&1
-        touch $HOME/fim
-    ) &
+# ==================================================
+# 📌 LÍNEA OFICIAL
+# ==================================================
+LINEA="${ROJO}══════════════════════════ / / / ══════════════════════════${RESET}"
 
-    tput civis
-    echo -ne "  ESPERANDO ["
-    while true; do
-        for((i=0; i<18; i++)); do
-            echo -ne "#"
-            sleep 0.1
-        done
-        [[ -e $HOME/fim ]] && rm $HOME/fim && break
-        echo -ne "]"
-        sleep 1
-        tput cuu1
-        tput dl1
-        echo -ne "  ESPERANDO ["
-    done
-    echo -e "] OK"
-    tput cnorm
+# ==================================================
+# 📌 BARRA OFICIAL
+# ==================================================
+barra_progreso() {
+comando="$1"
+(
+[[ -e $HOME/fim ]] && rm $HOME/fim
+$comando > /dev/null 2>&1
+touch $HOME/fim
+) > /dev/null 2>&1 &
+
+tput civis
+echo -ne "${CYAN}ESPERANDO ${ROJO}["
+while true; do
+   for((i=0; i<18; i++)); do
+      echo -ne "#"
+      sleep 0.08
+   done
+   [[ -e $HOME/fim ]] && rm $HOME/fim && break
+   echo -e "]"
+   sleep 1
+   tput cuu1
+   tput dl1
+   echo -ne "${CYAN}ESPERANDO ${ROJO}["
+done
+echo -e "] ${G}OK${RESET}"
+tput cnorm
 }
 
+# ==================================================
+# 📌 TÍTULO
+# ==================================================
+echo -e "$LINEA"
+echo -e "${BOLD}${BLANCO}                REINICIANDO SLOWDNS                ${RESET}"
+echo -e "$LINEA"
+
+# ==================================================
+# FUNCIÓN RESTART
+# ==================================================
 fun_restart() {
 
-    # Detener proceso anterior si existe
-    pkill -f dns-server 2>/dev/null
+# Detener proceso anterior
+pkill -f dns-server 2>/dev/null
 
-    sleep 2
+sleep 2
 
-    cd /etc/slowdns || exit 1
+cd /etc/slowdns || exit 1
 
-    # Iniciar nuevamente
-    screen -dmS slowdns ./dns-server -udp :5300 \
-    -privkey-file /root/server.key \
-    1234 127.0.0.1:22
+# Iniciar nuevamente
+screen -dmS slowdns ./dns-server -udp :5300 \
+-privkey-file /root/server.key \
+1234 127.0.0.1:22
+
+sleep 2
 }
 
-fun_bar fun_restart
+# ==================================================
+# EJECUTAR
+# ==================================================
+barra_progreso fun_restart
 
-echo ""
-echo "✔ SlowDNS reiniciado correctamente"
-echo ""
+echo
+echo -e "${G}✔ SlowDNS reiniciado correctamente${RESET}"
+echo
 read -p "Presiona ENTER para continuar..."
 
 slowdns
